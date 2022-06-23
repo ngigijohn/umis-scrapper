@@ -1,2 +1,5 @@
 .env
 /venv
+ob_report.pdf
+ob_report.xlsx
+report.csv
