@@ -153,3 +153,6 @@ scrapper = MyBot()
 
 # scrapper.login()
 scrapper.get_student_details('csv')
+
+
+
