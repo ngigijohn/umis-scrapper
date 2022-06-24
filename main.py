@@ -1,5 +1,4 @@
 import os
-from time import sleep
 from dotenv import load_dotenv
 
 from selenium import webdriver
@@ -9,6 +8,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
+from view_map import VIEW_MAP
 
 load_dotenv()
 
@@ -38,8 +38,8 @@ class MyBot():
 
         self.logged_in = False
 
-    def __export__(self, view, file_type):
-        url = f'https://registration.ueab.ac.ke/ueab/grid_export?view={view}'
+    def __export__(self, view_index, file_type):
+        url = f'https://registration.ueab.ac.ke/ueab/grid_export?view={view_index}'
 
         print('exporting as ' + file_type)
         if file_type == 'pdf':
@@ -71,88 +71,70 @@ class MyBot():
 
         self.driver.get(
             'https://registration.ueab.ac.ke/ueab/a_students.jsp?view=1:0')
+
         try:
-            wait_for_username_field = WebDriverWait(self.driver, self.delay).until(
-                EC.presence_of_element_located((By.ID, 'j_username')))
+            # wait for page to load completely
+            WebDriverWait(self.driver, self.delay).until(
+                lambda driver:
+                self.driver.execute_script(
+                    'return document.readyState') == 'complete')
             form_username_field = self.driver.find_element(By.ID, 'j_username')
             form_password_field = self.driver.find_element(By.ID, 'j_password')
 
-            # print("Page is ready!")
-            self.driver.get_screenshot_as_file('login_page.png')
+            # Enter login_credentials
             form_username_field.send_keys(login_credentials['STUDENT_ID'])
-
             form_password_field.send_keys(login_credentials['PASSWORD'])
 
-            # wait until submit button is clickable
-            #
+            # wait until submit button is clickable and click it
             WebDriverWait(self.driver, self.delay).until(
                 EC.element_to_be_clickable((
                     By.XPATH, '//*[@id="count-down-part"]/div/div/div/div/div[2]/form/div[6]/button'))).click()
 
-            # wait for login
-            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located(
-                (By.XPATH, '/html/body/div[3]/div[2]/div/div[2]/div[1]/div/div[1]/div')))
+            # wait for login page to load completely
+            WebDriverWait(self.driver, self.delay).until(
+                lambda driver:
+                self.driver.execute_script(
+                    'return document.readyState') == 'complete')
             self.driver.get_screenshot_as_file('login_success.png')
 
+            if self.driver.current_url == 'https://registration.ueab.ac.ke/ueab/a_students.jsp?view=1:0':
+                self.logged_in = True
+                print('Login successful')
+                self.driver.get_screenshot_as_file(
+                    './screenshots/login_success.png')
+
             # verify login success
-            if self.driver.current_url == 'https://registration.ueab.ac.ke/ueab/j_security_check':
-                print('Login failed')
+            elif self.driver.current_url == 'https://registration.ueab.ac.ke/ueab/j_security_check':
+                print('Login failed:   wrong credentials')
                 self.logged_in = False
 
             else:
-                self.driver.get_screenshot_as_file('user_page.png')
-                print('Logged in')
-                self.logged_in = True
+                print('Login failed: unknown error')
 
         except TimeoutException:
             print("Loading took too much time!")
 
-    def get_finance_statement(self, file_type='png'):
-        # only png screenshot is supported
+    def get_view_data(self, account_type='a_students', view='dashboard', file_type='png'):
+        view_index = VIEW_MAP[view]
         if self.__confirm_login__():
-            self.driver.get(
-                'https://registration.ueab.ac.ke/ueab/a_statement.jsp?view=22:0')
-            # implicitly wait for table to load
-            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located(
-                (By.XPATH, '/html/body/div[3]/div[2]/div/div/table')))
-            self.driver.get_screenshot_as_file('finance_statement.png')
-
-    def get_student_details(self, file_type='png'):
-        if self.__confirm_login__():
-            url = "https://registration.ueab.ac.ke/ueab/a_students.jsp?view=2:0"
-            view = "2:0"
+            url = f'https://registration.ueab.ac.ke/ueab/{account_type}.jsp?view={view_index}'
             self.driver.get(url)
-
-            # implicitly wait for table to load
+            # wait for page to load completely
             WebDriverWait(self.driver, self.delay).until(
-                EC.presence_of_element_located((By.XPATH, '//*[@id="portletBody"]/div/table/tbody')))
+                lambda driver:
+                self.driver.execute_script(
+                    'return document.readyState') == 'complete')
             if file_type == 'png':
-                self.driver.get_screenshot_as_file('student_details.png')
-
+                self.driver.get_screenshot_as_file(
+                    f'./screenshots/{view}.png')
             else:
-                self.__export__(view, file_type)
-
-    def get_student_courses(self, file_type='png'):
-        pass
-
-    def get_selected_time_table(self, file_type='png'):
-        if self.__confirm_login__():
-            url = 'https://registration.ueab.ac.ke/ueab/a_students.jsp?view=28:0'
-            view = '28:0'
-            self.driver.get(url)
-            # implicitly wait for table to load
-            WebDriverWait(self.driver, self.delay).until(EC.presence_of_element_located(
-                (By.XPATH, '//*[@id="portletBody"]')))
-            if file_type == 'png':
-                self.driver.get_screenshot_as_file('selected_time_table.png')
-            else:
-                self.__export__(view, file_type)
+                self.__export__(view_index, file_type)
 
 
 scrapper = MyBot()
 
-# scrapper.login()
-scrapper.get_student_details('csv')
+# available views ['schools_list','dashboard','student_details','finance_statement','current_timetable','semester_register','selected_courses','selected_timetable','unofficial_transcript','semester_gpa','check_listing',]
+# available account types ['a_students','a_statement']
+# use 'a_statement' for finance_statement
 
-
-
+scrapper.get_view_data('a_students', 'semester_gpa', 'csv')
