@@ -1,5 +1,7 @@
+from getpass import getpass
 import os
 from dotenv import load_dotenv
+from memory_profiler import profile
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -60,10 +62,21 @@ class MyBot():
             return True
 
     def get_login_credentials(self):
-        login_credentials = {
-            'STUDENT_ID': os.environ.get('STUDENT_ID'),
-            'PASSWORD': os.environ.get('PASSWORD')
-        }
+        if __name__ == '_main__':
+            student_id = input('Enter your student ID: ')
+            password = getpass('Enter your password: ')
+
+            login_credentials = {
+                'STUDENT_ID': student_id,
+                'PASSWORD': password
+            }
+            
+        else:
+            login_credentials = {
+                'STUDENT_ID': os.environ.get('STUDENT_ID'),
+                'PASSWORD': os.environ.get('PASSWORD')
+            }
+            
         return login_credentials
 
     def login(self):
@@ -114,6 +127,7 @@ class MyBot():
         except TimeoutException:
             print("Loading took too much time!")
 
+    # @profile
     def get_view_data(self, account_type='a_students', view='dashboard', file_type='png'):
         view_index = VIEW_MAP[view]
         if self.__confirm_login__():
@@ -129,12 +143,32 @@ class MyBot():
                     f'./screenshots/{view}.png')
             else:
                 self.__export__(view_index, file_type)
+        self.driver.quit()
+
+    def run_prompt(self):
+        print('Enter a view to get data for: ')
+        views = list(VIEW_MAP.keys())
+        file_types = ['png', 'pdf', 'csv', 'excel']
+        for index, view in enumerate(views):
+            print(f'\t{index}:_{view}')
+        view = int(input('\n\nSelect a view : '))
+
+        account = 'a_students'
+        for index, file_type in enumerate(file_types):
+            print(f'\t{index}:_{file_type}')
+
+        file_type = int(input('\nEnter file type: '))
+        if view == 3:
+            account = 'a_statement'
+
+        self.get_view_data(account, views[view], file_types[file_type])
 
 
-scrapper = MyBot()
+if __name__ == '__main__':
+    scrapper = MyBot()
+    scrapper.run_prompt()
+    # scrapper.get_view_data('a_students', 'semester_gpa', 'csv')
 
 # available views ['schools_list','dashboard','student_details','finance_statement','current_timetable','semester_register','selected_courses','selected_timetable','unofficial_transcript','semester_gpa','check_listing',]
 # available account types ['a_students','a_statement']
 # use 'a_statement' for finance_statement
-
-scrapper.get_view_data('a_students', 'semester_gpa', 'csv')
